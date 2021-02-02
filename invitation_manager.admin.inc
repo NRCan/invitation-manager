@@ -53,19 +53,6 @@ function invitation_manager_admin() {
     '#description' => t('The github files will alaways be the most current. Re-save this page to update the included files.'),
   );
 
-  /*
-  $form['admin']['invitation_manager_mode'] = array(
-    '#type' => 'radios',
-    '#title' => t('What mode to run for im.json'),
-    '#options' => array(
-      'track' => t('Tracked url (logging)'),
-      'file' => t('Saved File (faster)'),
-    ),
-    '#default_value' => variable_get('invitation_manager_mode', 'file'),
-  );
-  */
-
-
   return system_settings_form($form);
 }
 
@@ -111,14 +98,7 @@ function invitation_manager_surveys($form, &$form_state) {
     '#default_value' => variable_get('invitation_manager_pages', ''),
     '#description' => $description,
   );
-  // ---
 
-  /*$form['config']['invitation_manager_placeholder_en'] = array(
-    '#type' => 'textarea',
-    '#title' => t('Placeholder HTML (English)'),
-    '#default_value' => variable_get('invitation_manager_placeholder_en', ''),
-    '#description' => t('L1 menu to embed in the page. Just the &lt;li&gt; entries'),
-  );*/
   $imjson = variable_get('invitation_manager_imjson');
   if (empty($imjson) || strlen($imjson) < 24) {
     $imjson = invitation_manager_get_default_imjson();
