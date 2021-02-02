@@ -1,0 +1,288 @@
+<?php
+/**
+ * @file
+ * Module gives statistics on different content types and their languages
+ *
+ */
+
+ /* Implements hook_permission
+ */
+  function invitation_manager_permission() {
+    return array(
+      'administer invitation manager' => array(
+        'title' => t('Manage Invitation Manager'),
+        'description' => t('Manage the Invitation Manager system. Pages where it is included and the configuration file.'),
+      ),
+    );
+  }
+
+/**
+ * Creates the settings page for the module
+ * Implements hook_menu
+ */
+function invitation_manager_menu() {
+  $items = array();
+
+  $tab_base_path = 'admin/structure/invitation_manager';
+  $items[$tab_base_path] = array(
+    'title'            => t('Custom Invitation Manager'),
+    'description'      => t('Manage the custom Invitation Manager'),
+    'page callback'    => 'drupal_get_form',
+    'page arguments'   => array('invitation_manager_surveys'),
+    'access callback'  => 'user_access',
+    'access arguments' => array('administer invitation manager'),
+    'file'             => 'invitation_manager.admin.inc',
+    'type'             => MENU_NORMAL_ITEM,
+    'weight'           => 20,
+  );
+
+  $items[$tab_base_path.'/config'] = array(
+    'title'            => t('Invitation Manager Surveys'),
+    'description'      => t('Manage the custom Invitation Manager configuration (im.json)'),
+    'page callback'    => 'drupal_get_form',
+    'page arguments'   => array('invitation_manager_surveys'),
+    'access callback'  => 'user_access',
+    'access arguments' => array('administer invitation manager'),
+    'file'             => 'invitation_manager.admin.inc',
+    'type'             => MENU_DEFAULT_LOCAL_TASK,
+    'weight'           => 10,
+  );
+
+  $items[$tab_base_path.'/admin'] = array(
+    'title'            => t('Invitation Manager Settings'),
+    'description'      => t('Manage the custom Invitation Manager'),
+    'page callback'    => 'drupal_get_form',
+    'page arguments'   => array('invitation_manager_admin'),
+    'access callback'  => 'user_access',
+    'access arguments' => array('administer invitation manager'),
+    'file'             => 'invitation_manager.admin.inc',
+    'type'             => MENU_LOCAL_TASK,
+    'weight'           => 20,
+  );
+
+  return $items;
+}
+
+
+function invitation_manager_get_menu_path() {
+  global $language;
+
+  // If the module is turned off use the menu from the distribution
+  $enabled = variable_get('invitation_manager_enabled', 'on');
+  $token_on = variable_get('invitation_manager_token', 'on');
+  $token = intval(time() / 1000);
+  if ($enabled !== 'on') {
+    return FALSE;
+  }
+
+  $mode = variable_get('invitation_manager_mode', 'file');
+  $return = FALSE;
+  //$language->language
+  $file = 'public://invitation_manager/im.json';
+  $return = file_create_url($file);
+  $token = getlastmod($return);
+  if ($mode != 'file') {
+    // return the tracked URL
+    $return = url('/invitation_manager/im.json');
+  }
+  if ($token_on) {
+    $return .= "?t=$token";
+  }
+  return $return;
+}
+
+
+function invitation_manager_prep_library() {
+  $mode = variable_get('invitation_manager_filemode', 'remote');
+
+  $library_folder = 'public://invitation_manager';
+
+  if (!file_prepare_directory($library_folder, FILE_CREATE_DIRECTORY)) {
+    watchdog('invitation_manager', 'Failed to create invitation_manager directory: %dirpath', array('%dirpath' => $library_folder_directory), WATCHDOG_ERROR);
+    return FALSE;
+  }
+
+  // Write config.json
+  $library_path = drupal_realpath($library_folder) . '/';
+  //dpm($library_path, 'library_path');
+
+  $config_file = $library_path . 'config.JSON';
+  $imjson_file_path = file_create_url($library_folder . '/' . 'im.json');
+
+  $fp = fopen($config_file, 'w');
+  /*
+  $config = array(
+    'dbURL' => $imjson_file_path,
+  );
+  fwrite($fp, json_encode($config));
+  */
+  fwrite($fp, <<< JSONDATA
+  { "dbURL": "$imjson_file_path" }
+JSONDATA
+);
+  fclose($fp);
+
+  // Create the htaccess file
+  $htaccess_file = $library_path . '.htaccess';
+  $fp = fopen($htaccess_file, 'w');
+  fwrite($fp, <<< HTACCESSDATA
+  Header set Access-Control-Allow-Origin "*"
+HTACCESSDATA
+);
+  fclose($fp);
+
+  // Files to copy
+  $files = array(
+    //'config.JSON',
+    'Overlay.js',
+    'Overlay.css',
+    'InvitationManager.js',
+  );
+  if ($mode == 'remote') {
+    $remote_base = 'https://raw.githubusercontent.com/ServiceCanada/invitation-manager/master/src/';
+  }
+  else {
+    $remote_base = drupal_get_path('module', 'invitation_manager')."/library/src/";
+    //$remote_base = getcwd() . '/' . drupal_get_path('module', 'invitation_manager')."/library/src/";
+  }
+
+  foreach ($files as $file) {
+    $filepath = $library_path . $file;
+
+    if ($mode == 'remote') {
+      $source = $remote_base . $file;
+      $remote = drupal_http_request($source);
+      $data = $remote->data;
+    }
+    else {
+      // Local
+      $source = $remote_base . $file;
+      $data = file_get_contents($source);
+    }
+
+    if ($file_saved = file_unmanaged_save_data($data, $filepath, FILE_EXISTS_REPLACE)) {
+      watchdog('invitation_manager', 'Saved file from: %source to file: %filename', array('%source' => $source, '%filename' => $file_saved));
+    }
+  }
+
+}
+
+function invitation_manager_get_default_imjson() {
+  $mode = variable_get('invitation_manager_filemode', 'remote');
+  if ($mode == 'remote') {
+    // Remote
+    $url = 'https://raw.githubusercontent.com/ServiceCanada/invitation-manager/master/docs/im.json';
+    $readfile = drupal_http_request($url);
+    $content = $readfile->data;
+  }
+  else {
+    // Local
+    $filepath = drupal_get_path('module', 'invitation_manager')."/library/docs/im.json";
+    $content = file_get_contents($filepath);
+
+  }
+
+  //dpm($filepath, $mode); dpm(array($content));
+
+  return $content;
+
+}
+
+/**
+ * Implements hook_init()
+ *
+ * @link https://api.drupal.org/api/drupal/modules%21system%21system.api.php/function/hook_init/7.x
+ */
+function invitation_manager_init() {
+  global $theme;
+
+  $enabled = variable_get('invitation_manager_enabled', 'on') == 'on';
+  $visibility = variable_get('invitation_manager_visibility', BLOCK_VISIBILITY_NOTLISTED);
+  $pages = variable_get('invitation_manager_pages', '');
+
+  if (!$enabled) {
+    return;
+  }
+
+
+  // Per-role visibility.
+  $roles = variable_get('invitation_manager_roles', array());
+  global $user;
+  $allow_user = FALSE;
+  $blank = TRUE;
+  foreach ($roles as $rid => $active) {
+    if ($active) {
+      $blank = FALSE;
+      if (user_has_role($rid)) {
+        $allow_user = TRUE;
+      }
+    }
+  }
+  if ($blank) {
+    $allow_user = TRUE;
+  }
+
+  if ($allow_user === FALSE) {
+    return FALSE;
+  }
+
+  // By Page Visibility
+  // Limited visibility blocks must list at least one page.
+  if ($visibility == BLOCK_VISIBILITY_LISTED && empty($pages)) {
+    return FALSE;
+  }
+
+  $main_theme = FALSE;
+  $theme_default = variable_get('theme_default');
+
+  if ($theme === $theme_default) {
+    $main_theme = TRUE;
+  }
+
+  if (!$main_theme) {
+    return FALSE;
+  }
+
+  // Match path if necessary.
+  if (!empty($pages)) {
+    //dpm($visibility, 'visiblity');
+    //dpm($pages, 'pages');
+
+    // Convert path to lowercase. This allows comparison of the same path
+    // with different case. Ex: /Page, /page, /PAGE.
+    $pages = drupal_strtolower($pages);
+    if ($visibility < BLOCK_VISIBILITY_PHP) {
+      // Convert the Drupal path to lowercase.
+      $path = drupal_strtolower(drupal_get_path_alias($_GET['q']));
+      // Compare the lowercase internal and lowercase path alias (if any).
+      $page_match = drupal_match_path($path, $pages);
+      if ($path != $_GET['q']) {
+        $page_match = $page_match || drupal_match_path($_GET['q'], $pages);
+      }
+      // When $visibility has a value of 0
+      // (BLOCK_VISIBILITY_NOTLISTED), the block is displayed on all pages
+      // except those listed in $pages. When set to 1
+      // (BLOCK_VISIBILITY_LISTED), it is displayed only on those pages
+      // listed in $pages.
+      $page_match = !($visibility xor $page_match);
+    }
+    else {
+      $page_match = FALSE;
+    }
+  }
+  else {
+    $page_match = TRUE;
+  }
+
+  if (!$page_match) {
+    return FALSE;
+  }
+
+  //drupal_set_message('INCLUDING INVITATION MANAGER ON PAGE', 'warning');
+
+  $library_folder = 'public://invitation_manager';
+  drupal_add_css($library_folder . '/' . 'Overlay.css', array('group' => CSS_DEFAULT, 'every_page' => TRUE));
+  drupal_add_js(file_create_url($library_folder . '/' . 'Overlay.js'), array('type' => 'file', 'preprocess' => FALSE, 'scope' => 'footer', 'weight' => 5, 'group' => JS_LIBRARY, 'every_page' => TRUE, 'defer' => TRUE));
+  drupal_add_js(file_create_url($library_folder . '/' . 'InvitationManager.js'), array('type' => 'file', 'preprocess' => FALSE, 'scope' => 'footer', 'weight' => 6, 'group' => JS_LIBRARY, 'every_page' => TRUE, 'defer' => TRUE));
+
+}

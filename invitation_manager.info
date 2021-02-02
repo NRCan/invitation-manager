@@ -1,0 +1,6 @@
+; $Id$
+name = Invitation Manager
+description = Implements the Invitation Manager popup code on the site.
+core = 7.x
+package = NRCan Internet
+configure = admin/structure/invitation_manager

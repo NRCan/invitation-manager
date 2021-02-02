@@ -1,0 +1,47 @@
+<?php
+
+/**
+ * @file
+ * Install hooks.
+ */
+
+
+  /**
+   * Implements hook_install().
+   */
+ function invitation_manager_install() {
+   // Add all permisisons to developer and administrator roles
+   $permissions = array('administer invitation manager');
+   foreach(array('administrator', 'developer') as $role_name) {
+    $role = user_role_load_by_name($role_name);
+    user_role_grant_permissions($role->rid, $permissions);
+   }
+
+   // Clear caches
+   if (function_exists('apc_clear_user_cache') && function_exists('apc_clear_cache')) {
+     apc_clear_user_cache();
+     apc_clear_opcode_cache();
+   }
+   cache_clear_all();
+
+  }
+
+/**
+ * Implements hook_uninstall().
+ */
+function invitation_manager_uninstall() {
+  $vars = array(
+    'invitation_manager_imjson',
+    'invitation_manager_enabled',
+    'invitation_manager_filemode',
+    'invitation_manager_enabled',
+    'invitation_manager_token',
+    'invitation_manager_hideadmin',
+    'invitation_manager_pages',
+    'invitation_manager_roles',
+  );
+
+  foreach ($vars as $name) {
+    variable_del($name);
+  }
+}
