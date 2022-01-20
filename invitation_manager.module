@@ -1,8 +1,7 @@
 <?php
 /**
  * @file
- * Module loads the Invitation Manager system created by Principal Publisher
- * https://github.com/ServiceCanada/invitation-manager
+ * Module gives statistics on different content types and their languages
  *
  */
 
@@ -78,6 +77,7 @@ function invitation_manager_get_menu_path() {
 
   $mode = variable_get('invitation_manager_mode', 'file');
   $return = FALSE;
+  //$language->language
   $file = 'public://invitation_manager/im.json';
   $return = file_create_url($file);
   $token = getlastmod($return);
@@ -93,8 +93,8 @@ function invitation_manager_get_menu_path() {
 
 
 function invitation_manager_prep_library() {
-  $mode = variable_get('invitation_manager_filemode', 'remote');
-
+  $mode = variable_get('invitation_manager_filemode', 'local');
+  $aa_enabled = variable_get('invitation_manager_aa_enabled', 'on') == 'on';
   $library_folder = 'public://invitation_manager';
 
   if (!file_prepare_directory($library_folder, FILE_CREATE_DIRECTORY)) {
@@ -104,13 +104,29 @@ function invitation_manager_prep_library() {
 
   // Write config.json
   $library_path = drupal_realpath($library_folder) . '/';
+  //dpm($library_path, 'library_path');
 
   $config_file = $library_path . 'config.JSON';
   $imjson_file_path = file_create_url($library_folder . '/' . 'im.json');
 
   $fp = fopen($config_file, 'w');
+  /*
+  $config = array(
+    'dbURL' => $imjson_file_path,
+  );
+  fwrite($fp, json_encode($config));
+  */
+  $aa_tracking = '';
+  if ($aa_enabled) {
+    $aa_tracking = ',
+  "Adobe" : "no"';
+  }
+
   fwrite($fp, <<< JSONDATA
-  { "dbURL": "$imjson_file_path" }
+{
+  "dbURL": "$imjson_file_path"$aa_tracking
+}
+
 JSONDATA
 );
   fclose($fp);
@@ -153,6 +169,12 @@ HTACCESSDATA
       $data = file_get_contents($source);
     }
 
+    if (function_exists('cloudfront_path_invalidate_invalidate_on_cloudfront')) {
+      cloudfront_path_invalidate_invalidate_on_cloudfront([
+        drupal_get_path('module', 'invitation_manager'). '/*',
+      ]);
+    }
+
     if ($file_saved = file_unmanaged_save_data($data, $filepath, FILE_EXISTS_REPLACE)) {
       watchdog('invitation_manager', 'Saved file from: %source to file: %filename', array('%source' => $source, '%filename' => $file_saved));
     }
@@ -174,6 +196,8 @@ function invitation_manager_get_default_imjson() {
     $content = file_get_contents($filepath);
 
   }
+
+  //dpm($filepath, $mode); dpm(array($content));
 
   return $content;
 
@@ -236,6 +260,9 @@ function invitation_manager_init() {
 
   // Match path if necessary.
   if (!empty($pages)) {
+    //dpm($visibility, 'visiblity');
+    //dpm($pages, 'pages');
+
     // Convert path to lowercase. This allows comparison of the same path
     // with different case. Ex: /Page, /page, /PAGE.
     $pages = drupal_strtolower($pages);

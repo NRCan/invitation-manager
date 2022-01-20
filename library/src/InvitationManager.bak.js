@@ -1,6 +1,7 @@
 /*
- * Inviation Manager Independent Version
+ * Inviation Manager Independent Version.
  */
+
 ( function ( $, window, document, wb_im ) {
 
 window.addEventListener( "load", imSetup);
@@ -17,12 +18,12 @@ function imSetup() {
 		surveyDB, 		// JSON var of data stored in im.json
 		surveyScope, 	// Equals 1 if survey page and 2 is survey site
 		dbURL, 			// location of im.xml, example "/content/dam/canada/json/im.json"
-		Adobe = 'no',			// Equals to yes if Adobe analytics is set
 
 		// The following variables are used for debugging with query string
 		overrideScope = false, 	// Query parameter sets this to a text value to force the scope (page or site)
 		overrideStart = false, 	// Query parameter sets this to true to ignore the start date of surveys
 		overrideID, 			// Query parameter sets this to an Id value for a specific survey
+
 
 		/*
 		* Name of session storage values
@@ -37,6 +38,7 @@ function imSetup() {
 	try {
 
 		// download the dbURL path
+
 		if (!dbURL)
 		{
 			dbUrlFromJson();
@@ -57,61 +59,56 @@ function imSetup() {
 	 * main function Part One - setup the survey data
 	 */
 	function mainPart1 () {
+
 		if (!dbURL) {
 			return;
 		}
+
 		// Enable console logging if debug mode is turned on
 		debugMode = checkEnableDebugMode();
+
 		consoleLog("Start");
 
 		// Check if any special parameters are used for testing reasons
 		checkTestParams();
+
 		consoleLog("Check Test Params");
 
-		/* In order to handle the proper functioning of IM for websites
-		 * that have IM installed on different subdomains from different servers,
-		 * survey serving is now conditioned by the presence of the cookie 'lastDateIMShown' and not
-		 * by the localstorage item 'lastDateIMShown'
-		 * If there is no cookie "lastDateIMShown", the user has not seen a survey
-		 */
-		if ( !getCookie('lastDateIMShown')) {
-			consoleLog("lastDateIMShown === null");
+		// Check if DB is already in session storage
+		surveyDB = JSON.parse(sessionStorage.getItem(storageNames.session));
 
-			// Check if DB is already in session storage
-			surveyDB = JSON.parse(sessionStorage.getItem(storageNames.session));
+		// If the user has not seen a survey
+		if (!localStorage.getItem('lastDateIMShown')) {
+
+			consoleLog("lastDateIMShown === null");
 
 			// Download the DB if it is not already stored
 			if (!surveyDB) {
-				consoleLog("downloadSurveyDB");
+				consoleLog("downloadSurveyDB - Get the surveyDB from local storage");
 				downloadSurveyDB();
+
 				// Asynchronous call, do not execute code here
 			}
 			else {
-				/* To take into consideration the surveys that were visible prior the 'cookie handling' implementation
-				 * the script has to check the localstorage for 'lastDateIMShown' and setup the cookie with that date.
-				 * The expiration of the cookie should be the sum of lastDateIMShown and the survey setting duration-delay value
-				 */
-				if(localStorage.getItem('lastDateIMShown')){
-					var cookieName = 'lastDateIMShown',
-					maxNbDaysIMPersist = new Date(localStorage.getItem('lastDateIMShown'));
-					maxNbDaysIMPersist.setDate(maxNbDaysIMPersist.getDate() + surveyDB.settings["duration-delay"]);
-					setCookie(cookieName,localStorage.getItem('lastDateIMShown'),maxNbDaysIMPersist, removeSubdomain(window.location.href.toLowerCase()));
-				}else{
-					mainPart2();
-				}
+				mainPart2();
 			}
 		}
 		// Case when the user has already seen an invitation
 		else {
 			consoleLog("User has seen an invitation already");
-			downloadSurveyDB();
-			// Asynchronous call may have been made, do not execute code here
-			/* If shown survey was served from another server, make sure the localstorage item 'lastDateIMShown' is set
-			 * with the value from 'lastDateIMShown' cookie.
-			 */
-			localStorage.setItem('lastDateIMShown', new Date(getCookie('lastDateIMShown')));
+			var	lastDateIMShown = new Date(localStorage.getItem("lastDateIMShown"));
+			if (isStorageExpired(lastDateIMShown)) {
+				consoleLog("DB Expired. Get and process new.");
+				localStorage.removeItem("lastDateIMShown");
+
+				downloadSurveyDB();
+
+				mainPart2();
+			}
 
 		}
+		// Asynchronous call may have been made, do not execute code here
+
 	}
 
 
@@ -119,23 +116,11 @@ function imSetup() {
 	 * main function Part two - select the survey to display
 	 */
 	function mainPart2() {
+
 		// Make sure the surveyDB object is set, it could not have been defined if
 		// localStorage was not defined and the json is unfound on the server
 		if (!surveyDB || !surveyDB.settings)
-			return;
-
-		if (getCookie('lastDateIMShown')) {
-			var	lastDateIMShown = new Date(getCookie('lastDateIMShown'));
-			// If storage delay is expired, remove 'lastDateIMShown' from cookie and localstorage
-			if (isStorageExpired(lastDateIMShown)) {
-				document.cookie = "lastDateIMShown=;expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure;domain=" + removeSubdomain(window.location.href.toLowerCase()) + ";path=/";
-				localStorage.removeItem( "lastDateIMShown" );
-			}
-			else{
-				return;
-			}
-		}
-
+		 return;
 
 		// At this point, we don't know if it the was just downloaded or if it was
 		// retrieved from session storage
@@ -187,8 +172,7 @@ function imSetup() {
 		// Check if url on whitelist
 		var list = getObjArr(surveyDB.settings.whitelist),
 			a = document.location,
-			//h = a.hostname + ":8080" + a.pathname,
-			h = a.host + a.pathname,
+			h = a.hostname + a.pathname,
 			didMatch = false;
 
 		if ( !list ) {
@@ -210,8 +194,7 @@ function imSetup() {
 		// Check if url is on blacklist
 		var list = getObjArr(surveyDB.settings.blacklist),
 			a = document.location,
-			//h = a.hostname + a.pathname;
-			h = a.host + a.pathname;
+			h = a.hostname + a.pathname;
 
 		for (var i = 0; i < list.length; i++) {
 			var l = list[i].url;
@@ -230,7 +213,10 @@ function imSetup() {
 
 		// b will be the index of a survey in cpySurveys that was chosen otherwise
 		// it will be undefined if no survey was selected
-		var b = getWeightedRandom(getPageAttributeMatches());
+		var matches = getPageAttributeMatches();
+		var b = getWeightedRandom(matches);
+
+    //consoleLog("Roll die " + b);
 
 		if ( b ) {
 
@@ -242,30 +228,34 @@ function imSetup() {
 
 				}
 			}
+
 			consoleLog("Select survey " + cpySurveys[selectedSurveyIndex].name);
-			// Popup the survey
-			invite(cpySurveys[selectedSurveyIndex]);
 
-			//set lastDateIMShown in localStorage and cookie with the date the visitor was invited
-			if(!getCookie('lastDateIMShown')  && !(/[?&]im_nocookiecheck=1/i.test(document.location.search))){
-				//set a cookie with the domain name and the date visitor was invited
-				var cookieName = 'lastDateIMShown';
-				var maxNbDaysIMPersist = new Date(),
-				lastDateIMShown = new Date();
-				maxNbDaysIMPersist.setDate(maxNbDaysIMPersist.getDate() + surveyDB.settings["duration-delay"]);
-				//set the date visitor was invited in localstorage
-				localStorage.setItem('lastDateIMShown', lastDateIMShown);
+			// Show survey only if user hasn't seen it last 15 days
+			var lastDateIMShown;
+			var now = new Date();
 
-				setCookie(cookieName,lastDateIMShown,maxNbDaysIMPersist, removeSubdomain(window.location.href.toLowerCase()))
+			if ( localStorage.getItem( "lastDateIMShown" ) ) {
+				lastDateIMShown = new Date(localStorage.getItem('lastDateIMShown'));
+			}
+
+			// Persistent cookie duration is the number of days of minimal interval between 2 surveys
+			if (!isStorageExpired(lastDateIMShown)) {
+
+				// Popup the survey
+				invite(cpySurveys[selectedSurveyIndex]);
+
+				//set the date visitor was invited
+				localStorage.setItem('lastDateIMShown', now);
 			}
 		}
 		else {
-
-      // ERIC GOODWIN - Jan 2022
-      //consoleLog("Restore session surveys from copy.");
-      surveyDB.surveys = JSON.parse(JSON.stringify(cpySurveys));
+			// ERIC
+			consoleLog("Restore session surveys from copy.");
+			surveyDB.surveys = JSON.parse(JSON.stringify(cpySurveys));
 
 			consoleLog("No survey selected, " + surveyDB.surveys.length + " surveys remain in session storage");
+
 			//save the updated DB to session storage
 			//the DB must be saved here since we need to remove surveys that were applicable on this page so we don't test for them again in the visit
 			sessionStorage.setItem(storageNames.session, JSON.stringify(surveyDB));
@@ -277,6 +267,9 @@ function imSetup() {
 	 * Check if debug mode is enabled
 	 */
 	function checkEnableDebugMode() {
+
+		// ERIC DEBUG
+		//return true;
 
 			//Set the local storage token to remember to log console info
 		if (/[?&]logim=(true|1)/i.test(document.location.search))
@@ -340,14 +333,14 @@ function imSetup() {
 		$.getJSON(
 		dbURL,
 		function() {
-			consoleLog("Get Json File is Successful ["+dbURL+"]");
+			consoleLog("Get Json File is Successful");
 		} )
 		.done( function(result) {
 			surveyDB = JSON.parse(JSON.stringify(result));
 			mainPart2();
 		} )
 		.fail( function() {
-			consoleLog( "Fail to get JSON File ["+dbURL+"]" );
+			consoleLog( "JSON File Error. Could not get, or error while parsing." );
 		} )
 		.always( function() {
 			consoleLog( "JSON file Complete" );
@@ -360,6 +353,9 @@ function imSetup() {
 	 * Take a date object as parameter and test if the storage date is expired
 	 */
 	function isStorageExpired(storageDate) {
+		if (!surveyDB) {
+			return true;
+		}
 		var now = new Date();
 		var maxNbDaysIMPersist = surveyDB.settings["duration-delay"];
 		if ( ( ( now - storageDate ) <= ( maxNbDaysIMPersist * 86400000 ) ) || !storageDate ) {
@@ -433,7 +429,9 @@ function imSetup() {
 	function getWeightedRandom(spec) {
 
 		var i, sum =0, r = Math.random();
+    var size = 0;
 		for (i in spec) {
+      if (spec.hasOwnProperty(i)) size++;
 
 			// be sure to never select something with 0% probability,
 			// since Math.random() can be 0
@@ -445,6 +443,17 @@ function imSetup() {
 			if (r <= sum)
 				return i;
 		}
+
+    // If we didn't return something the legit way but we're in debug mode.. then return something
+    if (checkEnableDebugMode()) {
+
+      var ret_index = Math.floor(Math.random() * size);
+      for (i in spec) {
+        if (ret_index-- <= 0) {
+          return i;
+        }
+      }
+    }
 
 	}
 
@@ -478,8 +487,7 @@ function imSetup() {
 		// those ones are removed and not tested on future pages in the visit
 
     	var surveySubList = {};
-		//var url = document.location.hostname + document.location.pathname;
-		var url = document.location.host + document.location.pathname;
+		var url = document.location.hostname + document.location.pathname;
 		var count = 0;
 
 		for (var i = 0; i < surveyDB.surveys.length; i++) {
@@ -574,46 +582,35 @@ function imSetup() {
 	 * Display the popup given the survey parameters
 	 */
 	function invite(survey) {
-		var popupInput
 
-    // ERIC GOODWIN Jan 2022 - trigger GA on popup and then on click
-    consoleLog('GA Popop');
-    if(typeof ga !== "undefined") {
-      ga("send", {
-        "hitType": "event",
-        "transport": "beacon",
-        "eventCategory": 'InvitationManager',
-        "eventAction": 'popup',
-        "eventLabel": 'survey',
-        "eventValue": survey["name"]
-      });
-    }
+		// Eric Goodwin - trigger GA on popup and then on click
+		consoleLog('GA Popop');
+		if(typeof ga !== "undefined") {
+			ga("send", {
+			  "hitType": "event",
+			  "transport": "beacon",
+			  "eventCategory": 'InvitationManager',
+			  "eventAction": 'popup',
+			  "eventLabel": 'survey',
+			  "eventValue": survey["title-en"]
+			});
+		}
 
-    // Adobe Analytics
-		if (typeof Adobe !== "undefined" && Adobe.toLowerCase() === "yes") {
-			popupInput = "<input type='hidden' name='popupName' value='" + survey["name"] + "'>"
-		}
-		else {
-			popupInput = ""
-		}
 
 		var html =
 		"<aside id='gc-im-popup' class='asideBody gc-im-wb-overlay gc-im-modal-content gc-im-overlay-def gc-im-wb-popup-mid shadow' tabindex='0' >" +
 			"<header class='gc-im-modal-header'>" +
-				"<div class='gc-im-modal-title'>" +
-				"<div class='gc-im-modal-title-fix1'>" + survey["title-" + wb_im.lang] + "</div>" +
-					"<div class='gc-im-modal-title-fix2'>" + "<button id='close-im' type='button' class='gc-im-overlaydef closeIcon zoomX' aria-label='Close' >&times;</button>" +
-					"</div>" +
-					"<div class='clearfix'></div>" +
+				"<div class='gc-im-modal-title'>" + survey["title-" + wb_im.lang] +
+					"<button id='close-im' type='button' class='gc-im-overlaydef closeIcon zoomX' aria-label='Close' >&times;</button>" +
 				"</div>" + // for the close icon
 			"</header>" +
 			"<div class='gc-im-modal-body'>" +
 				survey["body-" + wb_im.lang] +
-				"<ul class='list-inline mrgn-sm'>" +
-					"<li class='mrgn-sm marginBottom-yes'><a id='survey-yes' class='gc-im-btn gc-im-btn-primary' href='" + survey["link-" + wb_im.lang] + "' target='_blank'>" + survey["yes-" + wb_im.lang] + "</a></li> " +
-					"<li class='mrgn-sm marginBottom-no'><button id='survey-no' class='gc-im-btn gc-im-btn-secondary survey-close'>" + survey["no-" + wb_im.lang] + "</button></li>" +
+				"<ul class='list-inline mrgn-tp-md'>" +
+					"<li class='mrgn-tp-md marginBottom-yes'><a id='survey-yes' class='gc-im-btn gc-im-btn-primary' href='" + survey["link-" + wb_im.lang] + "' target='_blank'>" + survey["yes-" + wb_im.lang] + "</a></li> " +
+					"<li class='mrgn-tp-md marginBottom-no'><button id='survey-no' class='gc-im-btn gc-im-btn-secondary survey-close'>" + survey["no-" + wb_im.lang] + "</button></li>" +
 				"</ul>" +
-				popupInput +
+				"<input type='hidden' name='popupName' value='" + survey["title-en"] + "'>" +
 			"</div>" +
 			"<div class='gc-im-modal-footer  hidden'>" +
 
@@ -652,35 +649,35 @@ function imSetup() {
 		  	// Hide the overlay immediately.
 		  	$( this ).hide();
 
-        // ERIC GOODWIN 2022 - trigger GA on popup and then on click
-        if (e.target.id === "survey-no") {
-          consoleLog('GA click survey-no');
-        }
-        if (e.target.id === "survey-yes") {
-          consoleLog('GA click survey-yes');
-        }
-        if(typeof ga !== "undefined") {
-          if (e.target.id === "survey-no") {
-            ga("send", {
-              "hitType": "event",
-              "transport": "beacon",
-              "eventCategory": 'InvitationManager',
-              "eventAction": 'click',
-              "eventLabel": 'survey-no',
-              "eventValue": survey["title-en"]
-            });
-          }
-          if (e.target.id === "survey-yes") {
-            ga("send", {
-              "hitType": "event",
-              "transport": "beacon",
-              "eventCategory": 'InvitationManager',
-              "eventAction": 'click',
-              "eventLabel": 'survey-yes',
-              "eventValue": survey["title-en"]
-            });
-          }
-        }
+			// Eric Goodwin - trigger GA on popup and then on click
+			if (e.target.id === "survey-no") {
+				consoleLog('GA click survey-no');
+			}
+			if (e.target.id === "survey-yes") {
+				consoleLog('GA click survey-yes');
+			}
+			if(typeof ga !== "undefined") {
+				if (e.target.id === "survey-no") {
+					ga("send", {
+						"hitType": "event",
+						"transport": "beacon",
+						"eventCategory": 'InvitationManager',
+						"eventAction": 'click',
+						"eventLabel": 'survey-no',
+						"eventValue": survey["title-en"]
+					});
+				}
+				if (e.target.id === "survey-yes") {
+					ga("send", {
+						"hitType": "event",
+						"transport": "beacon",
+						"eventCategory": 'InvitationManager',
+						"eventAction": 'click',
+						"eventLabel": 'survey-yes',
+						"eventValue": survey["title-en"]
+					});
+				}
+			}
 
 		  	// Remove the overlay shortly afterwards.
 		  	// This is being done to prevent problems when the yes link is middle-clicked. If the overlay were to be immediately removed, middle-clicking the yes link would remove the overlay without opening the link in a new tab/window. To avoid that issue, the overlay is now getting immediately hidden, then removed a short time later.
@@ -718,9 +715,6 @@ function imSetup() {
 		// Insert the overlay directly before the <main> element.
 		$( "main" ).before( $html );
 
-		// Since jQuery fix will sanitize the target attribute, here is a quick solution to add it back right after the IM html popup is inserted
-		$("#survey-yes").attr("target", "_blank");
-
 		// Inset the "Skip to Invitation Manager Popup" link before the <main> element.
 		if (wb_im.lang === "fr")
 		{
@@ -736,16 +730,6 @@ function imSetup() {
 		$( "#gc-im-popup" ).trigger( "wb-init.gc-im-wb-overlay" );
 		$( "#gc-im-popup" ).trigger( "open.gc-im-wb-overlay" );
 
-		// add for Adobe tracking
-		if (!$html.is(":hidden") && Adobe.toLowerCase() === "yes")
-		{
-			var popUpName = $("input[name='popupName']").val();
-
-			_satellite.setVar('jsPopupName', popUpName);
-			//direct call rule
-			_satellite.track('popUpImpression');
-
-		}
 
 		// Correct popup positionning on load, on resize an on Y scroll if necessary
 		$( window ).on( "resize scroll", function() {
@@ -763,6 +747,8 @@ function imSetup() {
 			else{
 				$footer.removeClass( "im-mrgn" );
 			}
+
+
 			if ( $( window ).scrollTop() >= $( document ).outerHeight() - $( window ).outerHeight() - $footer.outerHeight() ) {
 					$html.css( {
 						bottom: ( $footer.outerHeight() - ( $( document ).outerHeight() - $( window ).outerHeight() - $( window ).scrollTop() ) + bottomY )
@@ -781,24 +767,27 @@ function imSetup() {
 	* get the dbURL path from the config.json file
 	*/
 	function dbUrlFromJson() {
+
 		// find the path of the current javascript file "InvitationManager.js"
+
 		var scripts = document.getElementsByTagName("script"),
 		i = 0,
 		path = "";
-		while (i < scripts.length) {
+		while (i < scripts.length)
+		{
 			var src = scripts[i].src;
-			if (src.indexOf("InvitationManager.js") > -1) {
+			if (src.indexOf("InvitationManager.js") > -1)
+			{
 				path = src.substring(0,src.lastIndexOf("/")+1);
 				break;
 			}
 			i++;
 		}
 
-		/* window.imConfigPath stores the path of the config.JSON file.
-		 * if not defined, the script will check for config.JSON in the same directory where InvitationManger.js is located
-		 */
-		if (window.imConfigPath) {
-			path = window.imConfigPath;
+		// This part is added just to work with github example
+		if (path.indexOf("https://combinatronics.com/ServiceCanada/invitation-manager/master/src") > -1)
+		{
+			path = "https://servicecanada.github.io/invitation-manager/";
 		}
 
 		// get the config.json file
@@ -809,14 +798,8 @@ function imSetup() {
 				consoleLog("Get Config File Path is Successful");
 			})
 			.done( function (result) {
-				var myConfig = JSON.parse( JSON.stringify( result ) );
+				var myConfig = JSON.parse( JSON.stringify( result ) );;
         		dbURL = myConfig.dbURL;
-        if (typeof myConfig.Adobe !== "undefined") {
-          Adobe = myConfig.Adobe;
-        }
-        if (Adobe.toLowerCase() === "yes") {
-          consoleLog("Adobe Analytics enabled");
-        }
 				if (dbURL) {
 					mainPart1();
 				}
@@ -830,44 +813,9 @@ function imSetup() {
 			.always( function() {
 				consoleLog("Get Config File Path is Completed");
 			});
+
 	}
 
-	/**
-	 * Return the domain name without the subdomain.
-	 * @param {string} url The domain url to be cleaned
-	 * @return {string} url without the subdomain;
-	 */
-	function removeSubdomain (url) {
-		const urlSegments = new URL(url).hostname.split('.')
-		// consider domains names having .gc or .qc before the domain name suffix
-		var arrIndex = ['gc', 'qc'].indexOf(urlSegments.slice(-2)[0]) >= 0 ?3:2;
-		return urlSegments.slice(0).slice(-(arrIndex)).join('.')
-	}
-
-	/**
-	 * Return the cookie value for a specific cookie.
-	 * @param {string} name cookie name
-	 * @return {string} cookie value
-	 */
-	function getCookie(name){
-		if (document.cookie.split(';').some((item) => item.trim().startsWith(name+'='))) {
-			return document.cookie.split('; ').find(row => row.startsWith(name.trim())).split('=')[1]
-		}
-		return false ;
-	}
-
-	/**
-	 * Set a cookie.
-	 * @param {string} cName cookie name
-	 * @param {Date} cValue cookie value
-	 * @param {Date} cExpDate cookie expiration date
-	 * @param {string} cDomain cookie domain
-	 */
-	function setCookie(cName,cValue,cExpDate,cDomain){
-		document.cookie = cName +"=" + cValue + ";expires=" + cExpDate
-				+ ";domain=" + cDomain + ";Secure;path=/";
-	}
 
 }
-
 } )( jQuery, window, document, wb_im);

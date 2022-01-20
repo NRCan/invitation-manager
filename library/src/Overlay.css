@@ -16,7 +16,7 @@
 
  .gc-im-wb-overlay.open {
 	 display: inline-block;
-	 position: fixed;
+	 position: fixed;		
 }
 
  .gc-im-overlay-def {
@@ -40,8 +40,8 @@
 /******* Custom css specific to Invitation Manager ******* ************/
 /**********************************************************************/
 
-
-.gc-im-wb-popup-mid {
+ 
+.gc-im-wb-popup-mid { 
 	border-radius: 6px;
 	left: auto;
 	margin: 0 25px;
@@ -49,10 +49,10 @@
 	top: auto;
 	width: 35%;
 	bottom: 5%;
-
+		
 	/* flexible height */
-	max-height: 90%;
-
+	max-height: 70%;
+	
 }
 
 @media screen and (min-width: 992px) and (max-width: 1199px) {
@@ -86,45 +86,53 @@
 	-webkit-transform: translateZ(0);
 	transform: translateZ(0);
 	z-index: 1050;
-	float: right;
+	float: right; 	
 }
 
-.gc-im-modal-content{
-	position: fixed;
+.gc-im-modal-content{ 
+	position: fixed; 
 	outline: 0;
 }
 
-.list-inline {
+#gc-im-popup .list-inline {
 	padding-left: 0;
 	list-style: none;
 }
 
-.closeIcon {
-	float: right;
-	font-size: 1em;
-	font-weight: 700;
-	line-height: 0.8;
-	color: #fff;
-	background-color: transparent;
-	border : transparent;
-	margin-right: 0;
+#gc-im-popup .mrgn-sm { 
+	margin: 5px; 
 }
 
 
-.gc-im-overlay-def header {
+.closeIcon {
+	float: right; 
+	font-size: 1em; 
+	font-weight: 700; 
+	line-height: 0.8; 
+	color: #fff; 
+	background-color: transparent; 
+	border : transparent;
+	/* Fixes for close icon 
+	margin-right: 0; */
+	margin-right: 0 5px 0 0;
+	padding: 0;	
+}
+
+
+.gc-im-overlay-def header { 
 	background-color: #2e5274;
 	color: #fff;
 	display: block;
 	padding: 0 8px;
 }
-
+				
 .zoomX {
 	font-size: 1.8em;
 	color: #FFFFFF;
 }
 
 .zoomX:hover {
-	color: #C6C2D2; /*rgba(225,228,231,1); */
+	color: #C6C2D2; /*rgba(225,228,231,1); */ 	
 }
 
 
@@ -136,13 +144,13 @@
 	width: 1px;
 }
 
-.asideBody {
+.asideBody {	
 	font-family:  “Helvetica Neue”, Helvetica, Arial, sans-serif;
 	font-size: 16px;
 	line-height:  1.4375;
 	color: #333;
 	background-color: #F9F9F9;
-	-webkit-tap-highlight-color: rgba(0,0,0,0);
+	-webkit-tap-highlight-color: rgba(0,0,0,0);	
 }
 
 .gc-im-btn{
@@ -150,7 +158,7 @@
 	border: 1px outset #E1E4E7;
 	padding: 6px 12px;
 	line-height: 1.4375;
-	border-radius: 4px;
+	border-radius: 4px;	
 	display: inline-block;
 	font-weight: 500;
 	font-size: 1em;
@@ -162,7 +170,7 @@
 
 a.gc-im-btn {
 	text-decoration: none;
-
+	
 }
 
 .gc-im-btn:focus {
@@ -171,7 +179,8 @@ a.gc-im-btn {
 
 .gc-im-btn-primary {
 	background-color: #26374A;
-	color: #FFFFFF;
+	/*color: #FFFFFF;*/
+	color: #FFFFFF !important;
 }
 .gc-im-btn-primary:focus {
 	background-color: #1C578A;
@@ -195,8 +204,14 @@ a.gc-im-btn {
 
 #gc-im-popup {
 	border-color: #F0F0F0;
-    border-style: outset;
+    border-style: outset; 
     border-width: 2px;
+}
+
+#gc-im-popup:focus {
+	border-color: black;
+    border-style: outset; 
+    border-width: 3px;
 }
 
 #gc-im-popup p{
@@ -208,10 +223,12 @@ a.gc-im-btn {
 	font-weight: 700;
 }
 
-#gc-im-popup ul.list-inline li{
-	display: inline;
+#gc-im-popup ul.list-inline li{ 
+	display: inline; 
+	padding-left: 5px;
+	padding-right: 5px;	
 }
-
+				
 #gc-im-popup ul li {
 	float: left;
 }
@@ -219,7 +236,7 @@ a.gc-im-btn {
 #gc-im-popup ul li.marginBottom-yes {
 	margin-bottom: 5px;
 }
-
+				
 #gc-im-popup ul li.marginBottom-no {
 	margin-bottom: 15px;
 }
@@ -230,18 +247,36 @@ a.gc-im-btn {
 	margin: 0;
 	overflow: hidden;
 	position: absolute;
-	width: 1px;
+	width: 1px; 
  }
-
+ 
  .gc-skipLink:focus {
 	clip: rect(auto, auto, auto, auto);
 	height: inherit;
 	margin: inherit;
 	overflow: inherit;
 	position: static;
-	width: inherit;
+	width: inherit; 
 }
 
 .im-mrgn {
 	margin-top: 350px;
+}
+
+/* Fixes for Iphone7 close button */
+.gc-im-modal-title-fix1 {
+	width: 90%;
+	float: left;
+	margin-bottom: 0px;
+}
+
+.gc-im-modal-title-fix2 {
+	width: 10%;
+	float: right;
+}
+
+#gc-im-popup div.clearfix::after {
+	content: " ";
+	clear: both;
+	display: table;
 }

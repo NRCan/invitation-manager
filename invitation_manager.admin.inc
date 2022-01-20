@@ -25,6 +25,13 @@ function invitation_manager_admin() {
     '#default_value' => variable_get('invitation_manager_enabled', 'off'),
   );
 
+  $form['admin']['invitation_manager_aa_enabled'] = array(
+    '#type' => 'radios',
+    '#title' => t('Enable Adobe Analytics tracking of popups'),
+    '#options' => $enable_options,
+    '#default_value' => variable_get('invitation_manager_aa_enabled', 'off'),
+  );
+
   // Per-role visibility.
   $role_options = array_map('check_plain', user_roles());
   $form['admin']['invitation_manager_roles'] = array(
@@ -42,6 +49,7 @@ function invitation_manager_admin() {
     '#default_value' => variable_get('invitation_manager_token', 'on'),
   );
 
+/*
   $form['admin']['invitation_manager_filemode'] = array(
     '#type' => 'radios',
     '#title' => t('On save use module files or pull from github'),
@@ -52,6 +60,20 @@ function invitation_manager_admin() {
     '#default_value' => variable_get('invitation_manager_filemode', 'local'),
     '#description' => t('The github files will alaways be the most current. Re-save this page to update the included files.'),
   );
+  */
+
+  /*
+  $form['admin']['invitation_manager_mode'] = array(
+    '#type' => 'radios',
+    '#title' => t('What mode to run for im.json'),
+    '#options' => array(
+      'track' => t('Tracked url (logging)'),
+      'file' => t('Saved File (faster)'),
+    ),
+    '#default_value' => variable_get('invitation_manager_mode', 'file'),
+  );
+  */
+
 
   return system_settings_form($form);
 }
@@ -98,11 +120,22 @@ function invitation_manager_surveys($form, &$form_state) {
     '#default_value' => variable_get('invitation_manager_pages', ''),
     '#description' => $description,
   );
+  // ---
 
+  /*$form['config']['invitation_manager_placeholder_en'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Placeholder HTML (English)'),
+    '#default_value' => variable_get('invitation_manager_placeholder_en', ''),
+    '#description' => t('L1 menu to embed in the page. Just the &lt;li&gt; entries'),
+  );*/
   $imjson = variable_get('invitation_manager_imjson');
   if (empty($imjson) || strlen($imjson) < 24) {
     $imjson = invitation_manager_get_default_imjson();
   }
+
+  $form['config']['note'] = [
+    '#markup' => '<p>You may want to read the <a href="https://github.com/ServiceCanada/invitation-manager/wiki/Installation-Guide">Installation Guide</a> since it includes details about the configuration file.</p>',
+  ];
 
   $form['config']['invitation_manager_imjson'] = array(
     '#type' => 'textarea',
@@ -148,8 +181,22 @@ function invitation_manager_surveys_save_files($form, $form_state) {
     //$file_contents = check_markup($file_contents, 'full_html', $lang, FALSE);
 
     // Save both the new file and a timestamped backup
-    $result = file_unmanaged_save_data($file_contents, $file_destination.$file_path, FILE_EXISTS_REPLACE);
+    $output_imfile = $file_destination.$file_path;
+    $result = file_unmanaged_save_data($file_contents, $output_imfile, FILE_EXISTS_REPLACE);
     $result = file_unmanaged_save_data($file_contents, $file_destination.$date.'_'.$file_path);
+
+    if (function_exists('cloudfront_path_invalidate_invalidate_on_cloudfront')) {
+
+      $absolute_imfile = file_create_url($output_imfile);
+      $imfile_path = parse_url($absolute_imfile);
+
+      $output_conffile = $file_destination.'config.JSON';
+      $absolute_conffile = file_create_url($output_conffile);
+      $conffile_path = parse_url($absolute_conffile);
+
+      $clear_files = [$imfile_path['path'], $conffile_path['path']];
+      cloudfront_path_invalidate_invalidate_on_cloudfront($clear_files);
+    }
   }
 
   // Save/Update other files.
